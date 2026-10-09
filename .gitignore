@@ -49,6 +49,7 @@ next-env.d.ts
 test-results
 
 # private/local documentation and tooling — not part of the public repo
+/00_*/
 /explanatory_docs/
 /status_improv_docs/
 /claude_docs/
