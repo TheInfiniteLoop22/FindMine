@@ -1,0 +1,61 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+.env*
+# ...except the template, which has no real values and should ship with the
+# repo (README's setup instructions depend on it existing) - .dockerignore
+# already had this exception, .gitignore never did, so .env.example was
+# never actually committed until now despite existing locally.
+!.env.example
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+/src/generated/prisma
+test-results
+
+# private/local documentation and tooling — not part of the public repo
+/explanatory_docs/
+/status_improv_docs/
+/claude_docs/
+/project_docs/
+/.claude/
+/.agents/
+/.windsurf/
+/skills-lock.json
+/prompt.md
+.vscode/

@@ -1,0 +1,14 @@
+node_modules
+.next
+.git
+.env
+.env.*
+!.env.example
+npm-debug.log*
+*.md
+claude_docs
+project_docs
+explanatory_docs
+status_improv_docs
+.vercel
+coverage
