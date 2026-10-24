@@ -6,6 +6,7 @@ import { PostType, PostStatus, Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { rateLimit } from '@/lib/rateLimit';
 import { runEmbeddingJob } from '@/lib/directRunner';
+import { cloudinaryImageUrlSchema } from '@/lib/validation';
 
 import { logger } from '@/lib/logger';
 
@@ -19,7 +20,7 @@ const postCreateSchema = z.object({
   lng: z.number(),
   privateDetail: z.string().optional().nullable(),
   contactPhone: z.string().optional().nullable(),
-  imageUrls: z.array(z.string()).min(1, 'At least 1 photo is required').max(3),
+  imageUrls: z.array(cloudinaryImageUrlSchema).min(1, 'At least 1 photo is required').max(3),
   eventDateTime: z.string().optional().nullable(),
   itemStatus: z.enum(['WITH_ME', 'DEPOSITED']).optional().nullable(),
   depositLocationText: z.string().optional().nullable(),

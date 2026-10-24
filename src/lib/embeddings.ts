@@ -65,6 +65,17 @@ function getClipVisionModel() {
   return clipVisionModelPromise;
 }
 
+/**
+ * Loads (downloads on first use, then initialises) both models ahead of the first
+ * post so the first user doesn't pay the multi-minute cold start. Sequential on
+ * purpose, like the job itself, to keep the memory peak down.
+ */
+export async function warmUpModels(): Promise<void> {
+  await getTextExtractor();
+  await getClipProcessor();
+  await getClipVisionModel();
+}
+
 export async function getTextEmbedding(text: string): Promise<number[]> {
   const extractor = await getTextExtractor();
   const output = await extractor(text, { pooling: 'mean', normalize: true });
@@ -75,6 +86,11 @@ async function fetchImageBuffer(imageUrl: string): Promise<Buffer> {
   if (imageUrl.startsWith('data:')) {
     const base64 = imageUrl.split(',')[1] || '';
     return Buffer.from(base64, 'base64');
+  }
+  // Post images are validated at the API boundary, but never fetch an arbitrary
+  // host from here even if a bad row got into the database some other way.
+  if (!/^https:\/\/res\.cloudinary\.com\//.test(imageUrl)) {
+    throw new Error('Refusing to fetch an image from a non-Cloudinary URL');
   }
   const res = await fetch(imageUrl);
   if (!res.ok) {

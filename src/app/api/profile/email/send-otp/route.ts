@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { sendEmail } from '@/lib/email';
+import { escapeHtml } from '@/lib/html';
 import { createEmailOtp } from '@/lib/emailOtp';
 import { checkIpRateLimit, getClientIp } from '@/lib/security';
 import { rateLimit } from '@/lib/rateLimit';
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized. Please sign in.' }, { status: 401 });
     }
 
-    const clientIp = getClientIp(request.headers.get('x-forwarded-for'));
+    const clientIp = getClientIp(request.headers.get('x-forwarded-for'), request.headers.get('cf-connecting-ip'));
     const ipLimit = checkIpRateLimit(clientIp);
     if (!ipLimit.success) {
       return NextResponse.json({ error: 'Too many attempts. Please try again shortly.' }, { status: 429 });
@@ -81,7 +82,7 @@ export async function POST(request: Request) {
       html: `
         <div style="font-family: sans-serif; padding: 20px; color: #1e293b;">
           <h2 style="color: #4f46e5;">Verify your email</h2>
-          <p>Hi ${currentUser.displayName},</p>
+          <p>Hi ${escapeHtml(currentUser.displayName)},</p>
           <p>Use this code to verify this email address for your FindMine account:</p>
           <p style="font-size: 32px; font-weight: bold; letter-spacing: 8px; text-align: center; background: #f8fafc; padding: 16px; border-radius: 8px; margin: 20px 0;">${code}</p>
           <p style="font-size: 12px; color: #94a3b8;">This code expires in 10 minutes. If you didn't request this, you can ignore this email.</p>

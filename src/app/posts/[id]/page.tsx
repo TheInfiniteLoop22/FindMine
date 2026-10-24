@@ -209,7 +209,11 @@ export default function PostDetailPage({
       }
 
       setPost(json.data);
-      alert('Post resolved! +10 Reputation points awarded.');
+      alert(
+        json.reputationAwarded
+          ? `Post resolved! +${json.reputationAwarded} Reputation points awarded.`
+          : 'Post closed.'
+      );
     } catch (err: unknown) {
       console.error('Error resolving post:', err);
       alert(getErrorMessage(err, 'Could not resolve post.'));

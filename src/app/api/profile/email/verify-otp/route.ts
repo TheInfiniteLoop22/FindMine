@@ -26,7 +26,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized. Please sign in.' }, { status: 401 });
     }
 
-    const clientIp = getClientIp(request.headers.get('x-forwarded-for'));
+    const clientIp = getClientIp(request.headers.get('x-forwarded-for'), request.headers.get('cf-connecting-ip'));
     const ipLimit = checkIpRateLimit(clientIp);
     if (!ipLimit.success) {
       return NextResponse.json({ error: 'Too many attempts. Please try again shortly.' }, { status: 429 });

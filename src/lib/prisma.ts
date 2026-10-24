@@ -28,9 +28,15 @@ if (isSupabase && !caCert && process.env.NODE_ENV === 'production') {
   );
 }
 
+// A database on this machine (local dev, the CI Postgres service container) has
+// no TLS; every remote host still requires a verified certificate.
+const isLocalDb = /@(localhost|127\.0\.0\.1)[:/]/.test(connectionString);
+
 const pool = new Pool({
   connectionString,
-  ssl: caCert
+  ssl: isLocalDb
+    ? false
+    : caCert
     ? { ca: caCert, rejectUnauthorized: true }
     // Publicly-trusted providers (Neon, RDS, etc.) verify fine against
     // Node's default trust store. Local/dev without any DB TLS is the only

@@ -2,8 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // HTTP-layer test for GET /api/qr/[token]: the field-level response
 // filtering by contactMode. This is a fully public, unauthenticated route
-// (anyone with the QR token can hit it), so it must never leak `phone` when
-// contactMode isn't SHOW_PHONE, or `email` when it isn't SHOW_EMAIL - that
+// (anyone with the QR token can hit it), so it must never leak `email` when
+// contactMode isn't SHOW_EMAIL - that
 // filtering happens in the route handler itself, not the DB layer, so it's
 // exactly the kind of thing that regresses silently on a refactor unless
 // it's tested directly. Mocks prisma/rateLimit/geoip/notifications entirely
@@ -89,15 +89,6 @@ describe('GET /api/qr/[token]', () => {
     expect(body.data.ownerName).toBe('Owner Name');
   });
 
-  it('never includes phone for SHOW_PHONE (phone data model was removed)', async () => {
-    findUniqueMock.mockResolvedValue({ ...baseItem, contactMode: 'SHOW_PHONE' });
-
-    const res = await GET(req(), makeParams());
-    const body = await res.json();
-
-    expect(body.data.phone).toBeUndefined();
-    expect(body.data.email).toBeUndefined();
-  });
 
   it('includes email but never phone for SHOW_EMAIL', async () => {
     findUniqueMock.mockResolvedValue({ ...baseItem, contactMode: 'SHOW_EMAIL' });

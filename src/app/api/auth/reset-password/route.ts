@@ -17,7 +17,7 @@ const resetPasswordSchema = z.object({
 // reset their password through Firebase's own hosted flow instead).
 export async function POST(request: Request) {
   try {
-    const clientIp = getClientIp(request.headers.get('x-forwarded-for'));
+    const clientIp = getClientIp(request.headers.get('x-forwarded-for'), request.headers.get('cf-connecting-ip'));
 
     // Unauthenticated by design (the token itself is the credential), so it needs
     // the same IP rate limit forgot-password already has — the token is a

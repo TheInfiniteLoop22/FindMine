@@ -6,9 +6,7 @@ import bcrypt from 'bcryptjs';
 const connectionString = process.env.DATABASE_URL || '';
 const pool = new Pool({
   connectionString,
-  ssl: {
-    rejectUnauthorized: false,
-  },
+  ssl: /localhost|127\.0\.0\.1/.test(connectionString) ? false : { rejectUnauthorized: true },
 });
 
 const adapter = new PrismaPg(pool);

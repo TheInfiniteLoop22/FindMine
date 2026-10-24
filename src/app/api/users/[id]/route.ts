@@ -13,7 +13,7 @@ export async function GET(
     // Fully public, unauthenticated (anyone can view any profile by ID) — same
     // category as the QR scan-lookup route, which already has this same
     // per-IP throttle for the same reason (was previously missing here).
-    const clientIp = getClientIp(request.headers.get("x-forwarded-for"));
+    const clientIp = getClientIp(request.headers.get('x-forwarded-for'), request.headers.get('cf-connecting-ip'));
     const limit = rateLimit(`user-profile:${clientIp}`, 30, 60000);
     if (!limit.success) {
       return NextResponse.json({ error: "Too many requests. Please try again shortly." }, { status: 429 });

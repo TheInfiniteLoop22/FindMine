@@ -69,19 +69,6 @@ export async function PATCH(
     const effectiveContactMode = contactMode !== undefined ? contactMode : item.contactMode;
     const effectiveEmail = email !== undefined ? email : item.email;
 
-    // SHOW_PHONE is no longer a usable contact mode — the phone data model
-    // backing it was removed. The enum value itself is kept only for
-    // backward-compat with existing rows (see doc 13); reject switching to it.
-    if (effectiveContactMode === 'SHOW_PHONE') {
-      return NextResponse.json(
-        {
-          error: 'Phone contact mode is no longer supported.',
-          code: 'CONTACT_MODE_UNSUPPORTED',
-        },
-        { status: 400 }
-      );
-    }
-
     if (effectiveContactMode === 'SHOW_EMAIL') {
       const user = await prisma.user.findUnique({
         where: { id: session.user.id },

@@ -115,8 +115,11 @@ export async function POST(
     const body = await request.json();
     const { messageText } = body;
 
-    if (!messageText?.trim()) {
+    if (typeof messageText !== "string" || !messageText.trim()) {
       return NextResponse.json({ error: "Message content is required." }, { status: 400 });
+    }
+    if (messageText.length > 2000) {
+      return NextResponse.json({ error: "Message is too long (max 2000 characters)." }, { status: 400 });
     }
 
     const message = await prisma.message.create({

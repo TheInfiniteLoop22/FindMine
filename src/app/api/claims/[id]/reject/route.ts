@@ -46,15 +46,17 @@ export async function POST(
     }
 
     // Wrap the update and reputation adjustments inside a transaction
-    const [updatedClaim] = await prisma.$transaction([
-      prisma.claim.update({
-        where: { id: claimId },
-        data: {
-          status: 'REJECTED',
-          reviewedAt: new Date(),
-        },
-      }),
-      prisma.reputationEvent.create({
+    // Status-guarded (compare-and-set): if a concurrent approve/reject already
+    // moved this claim out of PENDING, the update matches nothing and we abort
+    // instead of double-applying the reputation penalty.
+    const updatedClaim = await prisma.$transaction(async (tx) => {
+      const { count } = await tx.claim.updateMany({
+        where: { id: claimId, status: 'PENDING' },
+        data: { status: 'REJECTED', reviewedAt: new Date() },
+      });
+      if (count === 0) return null;
+
+      await tx.reputationEvent.create({
         data: {
           userId: claim.claimantId,
           type: 'CLAIM_REJECTED',
@@ -62,16 +64,20 @@ export async function POST(
           refPostId: claim.postId,
           refClaimId: claimId,
         },
-      }),
-      prisma.user.update({
+      });
+      await tx.user.update({
         where: { id: claim.claimantId },
-        data: {
-          reputationScore: {
-            decrement: 2,
-          },
-        },
-      }),
-    ]);
+        data: { reputationScore: { decrement: 2 } },
+      });
+      return tx.claim.findUnique({ where: { id: claimId } });
+    });
+
+    if (!updatedClaim) {
+      return NextResponse.json(
+        { error: 'This claim has already been reviewed.' },
+        { status: 409 }
+      );
+    }
 
     return NextResponse.json({ data: updatedClaim });
   } catch (error: unknown) {

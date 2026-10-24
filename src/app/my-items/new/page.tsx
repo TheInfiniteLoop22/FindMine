@@ -20,7 +20,7 @@ interface SelectedImage {
 interface CreatedRegisteredItem {
   nickname: string;
   publicToken: string;
-  contactMode: 'SHOW_EMAIL' | 'SHOW_PHONE' | 'RELAY_ONLY';
+  contactMode: 'SHOW_EMAIL' | 'RELAY_ONLY';
 }
 
 const MAX_FILE_SIZE_BYTES = 8 * 1024 * 1024; // 8MB, matches the server-side limit in /api/upload

@@ -4,6 +4,21 @@ interface RateLimitStore {
 
 const store: RateLimitStore = {};
 
+// Without this the store gains one entry per distinct key (user, IP, email) for
+// the lifetime of the process. Sweep expired windows every 10 minutes; unref()
+// so the timer never keeps the process (or a test run) alive on its own.
+const PRUNE_INTERVAL_MS = 10 * 60 * 1000;
+function pruneRateLimitStore() {
+  const now = Date.now();
+  for (const key of Object.keys(store)) {
+    if (now > store[key].resetAt) delete store[key];
+  }
+}
+if (typeof setInterval !== 'undefined') {
+  const timer = setInterval(pruneRateLimitStore, PRUNE_INTERVAL_MS);
+  timer.unref?.();
+}
+
 export function rateLimit(identifier: string, limit = 10, windowMs = 60000): { success: boolean; remaining: number } {
   const now = Date.now();
   const record = store[identifier];

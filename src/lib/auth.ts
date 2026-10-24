@@ -36,8 +36,8 @@ export async function authorizeCredentials(
   credentials: Partial<Record<'email' | 'password' | 'idToken' | 'displayName', string>> | undefined,
   req: Pick<import('next-auth').RequestInternal, 'headers' | 'body' | 'query' | 'method'>
 ) {
-  const xForwardedFor = (req?.headers as Record<string, string> | undefined)?.['x-forwarded-for'];
-  const clientIp = getClientIp(xForwardedFor);
+  const reqHeaders = req?.headers as Record<string, string> | undefined;
+  const clientIp = getClientIp(reqHeaders?.['x-forwarded-for'], reqHeaders?.['cf-connecting-ip']);
 
   const ipLimit = checkIpRateLimit(clientIp);
   if (!ipLimit.success) {

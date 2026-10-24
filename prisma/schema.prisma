@@ -114,9 +114,9 @@ model Post {
   depositLocationText String?
   depositLat      Float?
   depositLng      Float?
-  location        Unsupported("geography")?
-  imageEmbedding  Unsupported("vector")?
-  textEmbedding   Unsupported("vector")?
+  location        Unsupported("geography(Point, 4326)")?
+  imageEmbedding  Unsupported("vector(512)")?
+  textEmbedding   Unsupported("vector(384)")?
   embeddingStatus String                    @default("pending")
   claims          Claim[]
   user            User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -305,7 +305,6 @@ enum ClaimStatus {
 }
 
 enum ContactMode {
-  SHOW_PHONE
   SHOW_EMAIL
   RELAY_ONLY
 }

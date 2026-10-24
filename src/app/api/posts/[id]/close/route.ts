@@ -45,33 +45,29 @@ export async function POST(
       );
     }
 
-    // Atomically close the post, record the reputation event (+10 points), and update owner reputationScore
-    const [updatedPost] = await prisma.$transaction([
-      prisma.post.update({
-        where: { id: postId },
-        data: {
-          status: 'CLOSED',
-        },
-      }),
-      prisma.reputationEvent.create({
-        data: {
-          userId: post.userId,
-          type: 'POST_RESOLVED',
-          points: 10,
-          refPostId: postId,
-        },
-      }),
-      prisma.user.update({
-        where: { id: post.userId },
-        data: {
-          reputationScore: {
-            increment: 10,
-          },
-        },
-      }),
-    ]);
+    // Reputation is only earned for genuinely resolving a post (one that was
+    // MATCHED through an approved claim). Closing an OPEN post earns nothing,
+    // otherwise points could be farmed by creating and closing your own posts.
+    const earnsReputation = post.status === 'MATCHED';
 
-    return NextResponse.json({ data: updatedPost });
+    const updatedPost = await prisma.$transaction(async (tx) => {
+      const closed = await tx.post.update({
+        where: { id: postId },
+        data: { status: 'CLOSED' },
+      });
+      if (earnsReputation) {
+        await tx.reputationEvent.create({
+          data: { userId: post.userId, type: 'POST_RESOLVED', points: 10, refPostId: postId },
+        });
+        await tx.user.update({
+          where: { id: post.userId },
+          data: { reputationScore: { increment: 10 } },
+        });
+      }
+      return closed;
+    });
+
+    return NextResponse.json({ data: updatedPost, reputationAwarded: earnsReputation ? 10 : 0 });
   } catch (error: unknown) {
     logger.error('Error closing post', { error });
     return NextResponse.json(

@@ -49,16 +49,23 @@ if (typeof setInterval !== 'undefined') {
 }
 
 /**
- * Extracts the client IP from an `x-forwarded-for` header value.
+ * Extracts the client IP behind the hosting proxy chain.
  *
- * This app runs as a single-region Render web service behind Render's own edge
- * proxy — not a chain of multiple trusted proxies. Render's proxy appends the
- * real client IP as the LAST entry of the header; any earlier entries are
- * whatever the client itself sent and are trivially spoofable. Taking the
- * first entry (a common mistake) lets a client set its own rate-limit key and
- * dodge or pollute limits. Always take the last, non-empty entry instead.
+ * The deployed app sits behind Cloudflare and Render's own proxy, so the last
+ * `x-forwarded-for` entry is a shared edge address, not the caller: keying rate
+ * limits on it let one client dodge the limit while unrelated users shared a
+ * bucket. Cloudflare sets `cf-connecting-ip` to the real client address (and
+ * overwrites any value the client sent), so prefer it. Without it (local dev, or
+ * a platform with a single trusted proxy) fall back to the LAST non-empty
+ * `x-forwarded-for` entry - earlier entries are client-controlled and spoofable.
  */
-export function getClientIp(xForwardedFor: string | null | undefined): string {
+export function getClientIp(
+  xForwardedFor: string | null | undefined,
+  cfConnectingIp?: string | null
+): string {
+  const cf = cfConnectingIp?.trim();
+  if (cf) return cf;
+
   if (!xForwardedFor) return '127.0.0.1';
   const parts = xForwardedFor
     .split(',')

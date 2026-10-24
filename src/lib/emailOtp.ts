@@ -29,9 +29,16 @@ function generateOtp(): string {
 }
 
 /** Generates, stores (hashed), and returns a fresh 6-digit OTP for this email. */
+// The hash includes the email: tokenHash is globally unique, so hashing the bare
+// 6-digit code made two different emails that were issued the same code at the
+// same time collide on the unique index (and made the code alone a lookup key).
+function otpHash(email: string, code: string): string {
+  return hashToken(`${email}:${code}`);
+}
+
 export async function createEmailOtp(email: string): Promise<string> {
   const code = generateOtp();
-  const tokenHash = hashToken(code);
+  const tokenHash = otpHash(email, code);
   const expiresAt = new Date(Date.now() + OTP_TTL_MS);
 
   await prisma.secureToken.deleteMany({ where: { email, type: OTP_TYPE } });
@@ -42,20 +49,24 @@ export async function createEmailOtp(email: string): Promise<string> {
 
 /** Verifies a submitted OTP; single-use (deletes on success, whether valid or expired). */
 export async function verifyEmailOtp(email: string, code: string): Promise<boolean> {
-  const tokenHash = hashToken(code);
+  return consumeToken(otpHash(email, code), OTP_TYPE, email);
+}
+
+/**
+ * Atomically consumes a token: the delete is the claim. Two simultaneous
+ * submissions of the same valid code both reach this point, but only one
+ * `deleteMany` removes the row (count === 1), so a code can never be used twice.
+ */
+async function consumeToken(tokenHash: string, type: string, email: string): Promise<boolean> {
   const record = await prisma.secureToken.findUnique({ where: { tokenHash } });
-
-  if (!record || record.type !== OTP_TYPE || record.email !== email) {
+  if (!record || record.type !== type || record.email !== email) {
     return false;
   }
 
-  await prisma.secureToken.delete({ where: { id: record.id } }).catch(() => {});
+  const { count } = await prisma.secureToken.deleteMany({ where: { id: record.id } });
+  if (count !== 1) return false;
 
-  if (new Date() > record.expiresAt) {
-    return false;
-  }
-
-  return true;
+  return new Date() <= record.expiresAt;
 }
 
 /** Issues a short-lived ticket proving this email was just OTP-verified. */
@@ -72,18 +83,5 @@ export async function createVerifiedTicket(email: string): Promise<string> {
 
 /** Consumes a verified-email ticket; single-use. */
 export async function consumeVerifiedTicket(email: string, ticket: string): Promise<boolean> {
-  const tokenHash = hashToken(ticket);
-  const record = await prisma.secureToken.findUnique({ where: { tokenHash } });
-
-  if (!record || record.type !== TICKET_TYPE || record.email !== email) {
-    return false;
-  }
-
-  await prisma.secureToken.delete({ where: { id: record.id } }).catch(() => {});
-
-  if (new Date() > record.expiresAt) {
-    return false;
-  }
-
-  return true;
+  return consumeToken(hashToken(ticket), TICKET_TYPE, email);
 }

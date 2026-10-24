@@ -3,8 +3,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // HTTP-layer test for POST /api/registered-items: specifically the
 // contact-info-must-match-the-signed-in-user's-own-verified-field check
 // - a registered item's
-// SHOW_PHONE/SHOW_EMAIL contact info must be the caller's own verified
-// phone/account email, never an arbitrary client-supplied value, since a
+// SHOW_EMAIL contact info must be the caller's own account
+// email, never an arbitrary client-supplied value, since a
 // stranger who scans the QR code sees it directly. Mocks prisma/session
 // entirely (no real DB), so it runs in the default `npm test`/CI job.
 
@@ -81,14 +81,14 @@ describe('POST /api/registered-items', () => {
     );
   });
 
-  it('rejects SHOW_PHONE outright (phone data model was removed; enum value kept only for legacy rows)', async () => {
+  it('rejects the removed SHOW_PHONE mode as invalid input', async () => {
     getServerSessionMock.mockResolvedValue({ user: { id: 'user-1' } });
 
     const res = await POST(req({ ...baseBody, contactMode: 'SHOW_PHONE' }));
     const body = await res.json();
 
     expect(res.status).toBe(400);
-    expect(body.code).toBe('CONTACT_MODE_UNSUPPORTED');
+    expect(body.code).toBe('INVALID_INPUT');
     expect(findUniqueMock).not.toHaveBeenCalled();
     expect(createMock).not.toHaveBeenCalled();
   });

@@ -158,3 +158,47 @@ export async function sendFirebasePasswordResetEmail(email: string): Promise<boo
     return false;
   }
 }
+
+export class FirebaseSignInError extends Error {
+  code: string;
+  constructor(code: string) {
+    super(code);
+    this.name = 'FirebaseSignInError';
+    this.code = code;
+  }
+}
+
+/**
+ * Verifies an email + password against Firebase via the Identity Toolkit
+ * `accounts:signInWithPassword` REST endpoint and returns the ID token.
+ *
+ * This is why the password goes through OUR server instead of the browser calling
+ * Firebase directly: the server then sees every failed attempt and can apply its
+ * own per-IP rate limit and per-account lockout (src/lib/security.ts). Throws a
+ * FirebaseSignInError carrying Firebase's error code (e.g. INVALID_LOGIN_CREDENTIALS,
+ * USER_DISABLED, TOO_MANY_ATTEMPTS_TRY_LATER).
+ */
+export async function signInWithFirebasePassword(email: string, password: string): Promise<{ idToken: string }> {
+  const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+  if (!apiKey) {
+    throw new Error('Firebase API key is not configured');
+  }
+
+  const res = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, returnSecureToken: true }),
+    }
+  );
+
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    const code = String(data?.error?.message || 'UNKNOWN_ERROR').split(' ')[0];
+    throw new FirebaseSignInError(code);
+  }
+
+  return { idToken: data.idToken };
+}

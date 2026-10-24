@@ -53,6 +53,20 @@ export async function approveClaim(claimId: string, requestingUserId: string) {
   const [userAId, userBId] = [claim.ownerId, claim.claimantId].sort();
 
   const systemMessage = await prisma.$transaction(async (tx) => {
+    // 0) Serialize all approvals for this post. Two DIFFERENT claims approved at
+    // once would otherwise each approve their own row and then deadlock trying to
+    // reject each other's (Postgres aborts one with a 500). Taking a row lock on
+    // the post first makes the second transaction wait, then see the post is no
+    // longer OPEN and fail cleanly with POST_NOT_OPEN.
+    await tx.$queryRaw`SELECT id FROM "Post" WHERE id = ${claim.postId} FOR UPDATE`;
+    const lockedPost = await tx.post.findUnique({
+      where: { id: claim.postId },
+      select: { status: true },
+    });
+    if (!lockedPost || lockedPost.status !== 'OPEN') {
+      throw new ClaimApprovalError('POST_NOT_OPEN', 'This post is no longer open — it may have been closed or already matched.');
+    }
+
     // a) Mark target claim APPROVED — guarded by status: 'PENDING' as defense-in-depth
     // against a concurrent approve/reject racing past the check above (previously
     // unconditional; only safe by accident via ConversationPostLink.claimId's unique
@@ -120,6 +134,12 @@ export async function approveClaim(claimId: string, requestingUserId: string) {
       },
     });
     return { id: message.id, conversationId: message.conversationId };
+  }, {
+    // The default interactive-transaction timeout is 5 s and includes time spent
+    // waiting for the post row lock behind another approval. Give it room so a
+    // queued approval fails with a clean domain error, not a timeout.
+    maxWait: 10_000,
+    timeout: 20_000,
   });
 
   return { claim, systemMessage };

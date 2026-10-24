@@ -36,6 +36,18 @@ services:
         sync: false
       - key: RESEND_API_KEY
         sync: false
+      # Sign-up codes and alerts: set SMTP_* (any SMTP mailbox, e.g. a Gmail app
+      # password) to deliver to arbitrary recipients; it takes precedence over Resend.
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
       - key: ENABLE_DEMO_LOGIN
         value: "false"
       - key: NEXT_PUBLIC_ENABLE_DEMO_LOGIN

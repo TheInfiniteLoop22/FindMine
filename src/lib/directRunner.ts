@@ -117,13 +117,20 @@ export async function runEmbeddingJob(postId: string) {
 const STALE_PROCESSING_TIMEOUT_MS = 5 * 60 * 1000;
 const STALE_SWEEP_INTERVAL_MS = 5 * 60 * 1000;
 
-export async function sweepStaleEmbeddingJobs() {
+export async function sweepStaleEmbeddingJobs({ includeFailed = false } = {}) {
   try {
     const now = Date.now();
     const processingPosts = await prisma.post.findMany({
       where: { embeddingStatus: 'processing' },
       select: { id: true },
     });
+
+    // 'failed' posts are otherwise never retried. Retry them once per process
+    // start (not on every tick) so a permanently bad post costs one attempt per
+    // boot instead of a retry loop.
+    const failedIds = includeFailed
+      ? (await prisma.post.findMany({ where: { embeddingStatus: 'failed' }, select: { id: true } })).map((p) => p.id)
+      : [];
 
     const staleIds = processingPosts
       .map((p) => p.id)
@@ -135,16 +142,17 @@ export async function sweepStaleEmbeddingJobs() {
         return now - startedAt > STALE_PROCESSING_TIMEOUT_MS;
       });
 
-    if (staleIds.length === 0) return;
+    const retryIds = [...new Set([...staleIds, ...failedIds])];
+    if (retryIds.length === 0) return;
 
-    logger.warn('Embedding sweep: reclaiming stale processing posts', { count: staleIds.length, postIds: staleIds });
+    logger.warn('Embedding sweep: reclaiming stale/failed posts', { stale: staleIds.length, failed: failedIds.length, postIds: retryIds });
 
     for (const id of staleIds) {
       inFlightJobs.delete(id);
     }
 
     await prisma.post.updateMany({
-      where: { id: { in: staleIds } },
+      where: { id: { in: retryIds } },
       data: { embeddingStatus: 'pending' },
     });
 
@@ -155,7 +163,7 @@ export async function sweepStaleEmbeddingJobs() {
     // memory spike that likely caused that crash in the first place - a
     // self-sustaining restart loop, confirmed live (multiple posts reclaimed
     // and immediately re-run together, then another restart minutes later).
-    for (const id of staleIds) {
+    for (const id of retryIds) {
       try {
         await runEmbeddingJob(id);
       } catch (err) {
@@ -172,7 +180,7 @@ export function startStaleEmbeddingSweep() {
   // 'processing' row found right now is necessarily an orphan from whatever
   // process was running before this one, so there's no reason to wait a full
   // interval to reclaim it.
-  sweepStaleEmbeddingJobs().catch((err) => logger.error('Embedding sweep: initial sweep failed', { error: err }));
+  sweepStaleEmbeddingJobs({ includeFailed: true }).catch((err) => logger.error('Embedding sweep: initial sweep failed', { error: err }));
 
   const timer = setInterval(sweepStaleEmbeddingJobs, STALE_SWEEP_INTERVAL_MS);
   timer.unref?.();

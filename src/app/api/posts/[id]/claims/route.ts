@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
+import { Prisma } from '@prisma/client';
 
 import { logger } from '@/lib/logger';
 
@@ -146,14 +147,14 @@ export async function GET(
 
 
 const claimCreateSchema = z.object({
-  answerText: z.string().optional(),
-  proofImageUrl: z.string().url().optional().or(z.literal('')),
+  answerText: z.string().max(2000).optional(),
+  proofImageUrl: z.string().url().max(2048).optional().or(z.literal('')),
   itemStatus: z.enum(['WITH_ME', 'DEPOSITED']).optional(),
-  depositLocation: z.string().optional(),
+  depositLocation: z.string().max(500).optional(),
   depositLat: z.number().optional().nullable(),
   depositLng: z.number().optional().nullable(),
-  foundAt: z.string().optional(),
-  privateDetailAnswer: z.string().optional(),
+  foundAt: z.string().max(100).optional(),
+  privateDetailAnswer: z.string().max(2000).optional(),
 });
 
 export async function POST(
@@ -293,6 +294,14 @@ export async function POST(
 
     return NextResponse.json({ data: claim }, { status: 201 });
   } catch (error: unknown) {
+    // The partial unique index (Claim_active_per_claimant_key) turns a racing
+    // duplicate submission into a clean 409 instead of a second active claim.
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      return NextResponse.json(
+        { error: 'You already have an active or approved claim on this post.', code: 'CLAIM_EXISTS' },
+        { status: 409 }
+      );
+    }
     logger.error('Error filing claim', { error });
     return NextResponse.json(
       { error: getErrorMessage(error, 'Failed to file claim'), code: 'INTERNAL_SERVER_ERROR' },

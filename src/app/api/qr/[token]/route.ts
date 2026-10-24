@@ -13,7 +13,7 @@ export async function GET(
   { params }: { params: Promise<{ token: string }> }
 ) {
   try {
-    const clientIp = getClientIp(request.headers.get('x-forwarded-for'));
+    const clientIp = getClientIp(request.headers.get('x-forwarded-for'), request.headers.get('cf-connecting-ip'));
 
     // This is a fully public, unauthenticated endpoint (anyone with the QR/token can
     // hit it) — previously had no rate limiting at all.

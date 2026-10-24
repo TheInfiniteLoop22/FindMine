@@ -51,19 +51,6 @@ export async function POST(request: Request) {
 
     const { nickname, category, photoUrl, contactMode: cm, email } = parseResult.data;
 
-    // SHOW_PHONE is no longer a usable contact mode for new items — the phone
-    // data model backing it was removed. The enum value itself is kept only
-    // for backward-compat with existing rows (see doc 13); reject it here.
-    if (cm === 'SHOW_PHONE') {
-      return NextResponse.json(
-        {
-          error: 'Phone contact mode is no longer supported.',
-          code: 'CONTACT_MODE_UNSUPPORTED',
-        },
-        { status: 400 }
-      );
-    }
-
     // The contact info shown to a stranger who scans this item's QR code must
     // actually belong to the signed-in user — reusing a freely-typed value here
     // (previously format-validated only) would let someone route scans to an

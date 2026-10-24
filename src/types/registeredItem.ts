@@ -13,7 +13,7 @@ export interface QrScanResult {
   photoUrl: string | null;
   status: string;
   lostAt: string | null;
-  contactMode: 'SHOW_EMAIL' | 'SHOW_PHONE' | 'RELAY_ONLY';
+  contactMode: 'SHOW_EMAIL' | 'RELAY_ONLY';
   ownerName: string;
   email?: string;
 }
@@ -23,7 +23,7 @@ export interface RegisteredItemSummary {
   nickname: string;
   category: string | null;
   photoUrl: string | null;
-  contactMode: 'SHOW_EMAIL' | 'SHOW_PHONE' | 'RELAY_ONLY';
+  contactMode: 'SHOW_EMAIL' | 'RELAY_ONLY';
   status: string;
   publicToken: string;
   createdAt: string;

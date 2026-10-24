@@ -17,11 +17,16 @@ export const photoUrlSchema = z
     message: 'Photo must be uploaded via the upload button.',
   });
 
-// SHOW_PHONE is kept here only for backward-compat with any pre-existing
-// registered items that already used it — the UI no longer offers it as an
-// option, and the create/update routes reject it (they require a verified
-// phone, which is now impossible to obtain since phone/SMS auth was removed).
-export const contactModeSchema = z.enum(['SHOW_PHONE', 'SHOW_EMAIL', 'RELAY_ONLY']);
+// Phone contact mode was removed together with phone/SMS auth.
+export const contactModeSchema = z.enum(['SHOW_EMAIL', 'RELAY_ONLY']);
+
+// Images attached to a post are later fetched by the server (to compute their
+// embedding), so unlike profile/QR photos they must be Cloudinary URLs only -
+// accepting an arbitrary URL would let a client make the server request any host.
+export const cloudinaryImageUrlSchema = z
+  .string()
+  .max(2048, 'Image URL is too long.')
+  .regex(CLOUDINARY_URL_RE, 'Photo must be uploaded via the upload button.');
 
 export const emailFieldSchema = z
   .string()

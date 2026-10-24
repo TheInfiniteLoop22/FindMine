@@ -17,7 +17,7 @@ const verifyOtpSchema = z.object({
 // expiry and single-use consumption in emailOtp.ts.
 export async function POST(request: Request) {
   try {
-    const clientIp = getClientIp(request.headers.get('x-forwarded-for'));
+    const clientIp = getClientIp(request.headers.get('x-forwarded-for'), request.headers.get('cf-connecting-ip'));
 
     const ipLimit = checkIpRateLimit(clientIp);
     if (!ipLimit.success) {

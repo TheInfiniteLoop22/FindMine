@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { profileUpdateSchema, contactModeSchema, emailFieldSchema, photoUrlSchema } from '../validation';
+import { profileUpdateSchema, contactModeSchema, emailFieldSchema, photoUrlSchema, cloudinaryImageUrlSchema } from '../validation';
 
 // Regression coverage for PATCH /api/profile's validation (previously had
 // no schema at all beyond a hand-rolled displayName length check). Guards against the exact
@@ -61,8 +61,8 @@ describe('profileUpdateSchema', () => {
 });
 
 describe('shared validation pieces', () => {
-  it('contactModeSchema only accepts the three known enum values', () => {
-    expect(contactModeSchema.safeParse('SHOW_PHONE').success).toBe(true);
+  it('contactModeSchema only accepts the two supported modes (SHOW_PHONE was removed)', () => {
+    expect(contactModeSchema.safeParse('SHOW_PHONE').success).toBe(false);
     expect(contactModeSchema.safeParse('SHOW_EMAIL').success).toBe(true);
     expect(contactModeSchema.safeParse('RELAY_ONLY').success).toBe(true);
     expect(contactModeSchema.safeParse('ANYTHING_ELSE').success).toBe(false);
@@ -76,5 +76,22 @@ describe('shared validation pieces', () => {
   it('photoUrlSchema caps overall length even for the legacy base64 format', () => {
     const huge = 'data:image/png;base64,' + 'A'.repeat(20_000_000);
     expect(photoUrlSchema.safeParse(huge).success).toBe(false);
+  });
+});
+
+describe('cloudinaryImageUrlSchema (post images the server later fetches)', () => {
+  it('accepts a Cloudinary HTTPS URL', () => {
+    expect(cloudinaryImageUrlSchema.safeParse('https://res.cloudinary.com/demo/image/upload/v1/findmine/a.jpg').success).toBe(true);
+  });
+
+  it.each([
+    'http://res.cloudinary.com/demo/a.jpg',
+    'https://evil.example.com/a.jpg',
+    'https://res.cloudinary.com.evil.com/a.jpg',
+    'http://169.254.169.254/latest/meta-data/',
+    'data:image/png;base64,AAAA',
+    'file:///etc/passwd',
+  ])('rejects %s', (url) => {
+    expect(cloudinaryImageUrlSchema.safeParse(url).success).toBe(false);
   });
 });

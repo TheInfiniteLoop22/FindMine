@@ -9,6 +9,8 @@ import { parseCookie } from 'cookie';
 import { setIO } from './src/lib/socket';
 import { prisma } from './src/lib/prisma';
 import { startStaleEmbeddingSweep } from './src/lib/directRunner';
+import { warmUpModels } from './src/lib/embeddings';
+import { logger } from './src/lib/logger';
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = 'localhost';
@@ -105,6 +107,9 @@ app.prepare().then(() => {
 
   httpServer.listen(port, () => {
     console.log(`> Ready on http://${hostname}:${port} (Socket.IO real-time DMs enabled)`);
+    // Pre-load the ML models in the background after the server is accepting
+    // traffic; a failure only costs the first post its cold start.
+    warmUpModels().catch((err) => logger.warn('Model warm-up failed', { error: err }));
   });
 
   // Hosting platforms that redeploy/rescale (Railway, Render, Fly.io, Docker

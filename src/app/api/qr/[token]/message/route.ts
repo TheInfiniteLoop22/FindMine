@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { sendEmail } from '@/lib/email';
 import { createNotification } from '@/lib/notifications';
 import { z } from 'zod';
+import { escapeHtml } from '@/lib/html';
 
 import { logger } from '@/lib/logger';
 
@@ -94,17 +95,17 @@ export async function POST(
     const emailHtml = `
       <div style="font-family: sans-serif; padding: 20px; color: #1e293b;">
         <h2 style="color: #4f46e5;">[FindMine] Good News! A finder scanned your item</h2>
-        <p>Hello <strong>${item.user.displayName}</strong>,</p>
-        <p>A finder has scanned your registered item: <strong>${item.nickname}</strong> and sent you a secure relay message:</p>
+        <p>Hello <strong>${escapeHtml(item.user.displayName)}</strong>,</p>
+        <p>A finder has scanned your registered item: <strong>${escapeHtml(item.nickname)}</strong> and sent you a secure relay message:</p>
         
         <blockquote style="background: #f8fafc; border-left: 4px solid #4f46e5; padding: 15px; margin: 20px 0; font-style: italic;">
-          "${message.trim()}"
+          "${escapeHtml(message.trim())}"
         </blockquote>
 
         ${finderContact ? `
           <p><strong>Finder Contact Information:</strong><br />
           <span style="font-family: monospace; background: #f1f5f9; padding: 4px 8px; rounded: 4px;">
-            ${finderContact.trim()}
+            ${escapeHtml(finderContact.trim())}
           </span></p>
         ` : `
           <p><em>(The finder chose not to share their contact information)</em></p>

@@ -11,7 +11,6 @@ import { Navbar } from '@/components/Navbar';
 import { Loader2, AlertCircle, CheckCircle } from 'lucide-react';
 import { auth } from '@/lib/firebase';
 import {
-  signInWithEmailAndPassword,
   GoogleAuthProvider,
   signInWithPopup,
 } from 'firebase/auth';
@@ -143,10 +142,18 @@ function SignInForm() {
       // `user.emailVerified` would incorrectly read false for accounts
       // verified through this app's own email-OTP sign-up flow instead of
       // Firebase's native link.
-      const userCredential = await signInWithEmailAndPassword(auth, data.email, data.password);
-      const user = userCredential.user;
-
-      const idToken = await user.getIdToken();
+      // The password check goes through our own route (not the Firebase SDK
+      // directly) so the server can rate-limit and lock out repeated failures.
+      const pwRes = await fetch('/api/auth/password-signin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: data.email, password: data.password }),
+      });
+      const pwJson = await pwRes.json().catch(() => ({}));
+      if (!pwRes.ok || !pwJson?.data?.idToken) {
+        throw new Error(pwJson?.error || 'Invalid email or password.');
+      }
+      const idToken: string = pwJson.data.idToken;
       const signInRes = await signIn('credentials', {
         idToken,
         redirect: false,

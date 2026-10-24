@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
 import { sendEmail } from '@/lib/email';
+import { escapeHtml } from '@/lib/html';
 import { createSecureToken } from '@/lib/tokens';
 import { sendFirebasePasswordResetEmail } from '@/lib/firebaseAdmin';
 import { checkIpRateLimit, isCaptchaRequired, verifyCaptcha, getClientIp } from '@/lib/security';
@@ -16,7 +17,7 @@ const forgotPasswordSchema = z.object({
 // POST /api/auth/forgot-password - Secure forgot-password flow preventing user enumeration
 export async function POST(request: Request) {
   try {
-    const clientIp = getClientIp(request.headers.get('x-forwarded-for'));
+    const clientIp = getClientIp(request.headers.get('x-forwarded-for'), request.headers.get('cf-connecting-ip'));
 
     // 1. IP Rate Limiting Check
     const ipLimit = checkIpRateLimit(clientIp);
@@ -62,7 +63,7 @@ export async function POST(request: Request) {
           html: `
             <div style="font-family: sans-serif; padding: 20px; color: #1e293b;">
               <h2 style="color: #4f46e5;">Password Reset Request</h2>
-              <p>Hello <strong>${user.displayName}</strong>,</p>
+              <p>Hello <strong>${escapeHtml(user.displayName)}</strong>,</p>
               <p>Click the link below to choose a new password. This link expires in 1 hour and can only be used once.</p>
               <p style="margin: 24px 0;">
                 <a href="${resetLink}" style="background-color: #4f46e5; color: white; padding: 10px 20px; text-decoration: none; border-radius: 8px; font-weight: bold;">

@@ -23,7 +23,7 @@ const completeSchema = z.object({
 // even though Firebase's own emailVerified flag stays false for this account.
 export async function POST(request: Request) {
   try {
-    const clientIp = getClientIp(request.headers.get('x-forwarded-for'));
+    const clientIp = getClientIp(request.headers.get('x-forwarded-for'), request.headers.get('cf-connecting-ip'));
 
     const ipLimit = checkIpRateLimit(clientIp);
     if (!ipLimit.success) {

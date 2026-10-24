@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { sendEmail } from '@/lib/email';
+import { escapeHtml } from '@/lib/html';
 import { createEmailOtp } from '@/lib/emailOtp';
 import { checkIpRateLimit, getClientIp } from '@/lib/security';
 import { rateLimit } from '@/lib/rateLimit';
@@ -18,7 +19,7 @@ const sendOtpSchema = z.object({
 // account doesn't exist yet), so both an IP limit and a per-email limit apply.
 export async function POST(request: Request) {
   try {
-    const clientIp = getClientIp(request.headers.get('x-forwarded-for'));
+    const clientIp = getClientIp(request.headers.get('x-forwarded-for'), request.headers.get('cf-connecting-ip'));
 
     const ipLimit = checkIpRateLimit(clientIp);
     if (!ipLimit.success) {
@@ -57,7 +58,7 @@ export async function POST(request: Request) {
       html: `
         <div style="font-family: sans-serif; padding: 20px; color: #1e293b;">
           <h2 style="color: #4f46e5;">Verify your email</h2>
-          <p>Hi ${displayName},</p>
+          <p>Hi ${escapeHtml(displayName)},</p>
           <p>Use this code to finish creating your FindMine account:</p>
           <p style="font-size: 32px; font-weight: bold; letter-spacing: 8px; text-align: center; background: #f8fafc; padding: 16px; border-radius: 8px; margin: 20px 0;">${code}</p>
           <p style="font-size: 12px; color: #94a3b8;">This code expires in 10 minutes. If you didn't request this, you can ignore this email.</p>

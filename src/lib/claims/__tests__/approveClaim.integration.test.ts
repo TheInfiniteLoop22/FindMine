@@ -241,6 +241,62 @@ describe('approveClaim (integration)', () => {
     const reputationEvents = await prisma.reputationEvent.findMany({ where: { refClaimId: claim.id } });
     expect(reputationEvents).toHaveLength(0);
   });
+  it('lets exactly one of two concurrent approvals of DIFFERENT claims on one post win, with no deadlock', async () => {
+    // Regression for the cross-claim race: without the post-row lock the two
+    // transactions each approve their own claim and then deadlock rejecting each
+    // other's (Postgres aborts one with an unhandled 40P01). Repeat to shake out
+    // timing-dependent behaviour.
+    for (let round = 0; round < 3; round++) {
+      const owner = await createUser();
+      const claimantA = await createUser();
+      const claimantB = await createUser();
+      const post = await createPost(owner.id);
+      const claimA = await createClaim(post.id, claimantA.id, owner.id);
+      const claimB = await createClaim(post.id, claimantB.id, owner.id);
+
+      const results = await Promise.allSettled([
+        approveClaim(claimA.id, owner.id),
+        approveClaim(claimB.id, owner.id),
+      ]);
+
+      const fulfilled = results.filter((r) => r.status === 'fulfilled');
+      const rejected = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
+      expect(fulfilled).toHaveLength(1);
+      expect(rejected).toHaveLength(1);
+      // A clean domain error, never a raw database deadlock/serialization failure.
+      expect(rejected[0].reason).toBeInstanceOf(ClaimApprovalError);
+      expect(['POST_NOT_OPEN', 'ALREADY_REVIEWED']).toContain((rejected[0].reason as ClaimApprovalError).code);
+
+      for (const r of fulfilled) {
+        if (r.status === 'fulfilled' && r.value.systemMessage) createdConversationIds.push(r.value.systemMessage.conversationId);
+      }
+
+      const claims = await prisma.claim.findMany({ where: { postId: post.id } });
+      expect(claims.filter((c) => c.status === 'APPROVED')).toHaveLength(1);
+      expect(claims.filter((c) => c.status === 'REJECTED')).toHaveLength(1);
+      expect((await prisma.post.findUniqueOrThrow({ where: { id: post.id } })).status).toBe('MATCHED');
+      expect(await prisma.conversationPostLink.count({ where: { postId: post.id } })).toBe(1);
+    }
+  });
+
+  it('rejects a second active claim by the same claimant on the same post (partial unique index)', async () => {
+    const owner = await createUser();
+    const claimant = await createUser();
+    const post = await createPost(owner.id);
+    await createClaim(post.id, claimant.id, owner.id);
+
+    await expect(createClaim(post.id, claimant.id, owner.id)).rejects.toMatchObject({ code: 'P2002' });
+  });
+
+  it("allows a new claim after the claimant's earlier claim was rejected", async () => {
+    const owner = await createUser();
+    const claimant = await createUser();
+    const post = await createPost(owner.id);
+    const first = await createClaim(post.id, claimant.id, owner.id);
+    await prisma.claim.update({ where: { id: first.id }, data: { status: 'REJECTED' } });
+
+    await expect(createClaim(post.id, claimant.id, owner.id)).resolves.toBeTruthy();
+  });
 });
 
 describe('ClaimApprovalError', () => {

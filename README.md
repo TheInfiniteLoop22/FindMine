@@ -83,12 +83,12 @@ backup surface.
 │   ├── data/           # Static data
 │   └── types/          # Shared TypeScript types
 ├── prisma/             # schema.prisma, migrations, seed script
-├── scripts/            # DB setup (PostGIS/pgvector), seeding
+├── scripts/            # Sample-data seeding
 ├── certs/              # CA certificate for TLS-verified DB connections
 ├── server.ts           # Custom server: Next.js + Socket.IO
 ├── Dockerfile          # Production image
 ├── render.yaml         # Render Blueprint
-└── .github/workflows/  # CI (typecheck + tests, lint)
+└── .github/workflows/  # CI (typecheck, lint, unit + integration tests)
 ```
 
 ### API overview
@@ -97,7 +97,7 @@ All routes live under `src/app/api/`.
 
 | Area | Routes |
 |---|---|
-| Auth | `auth/[...nextauth]`, `auth/signup/{send-otp,verify-otp,complete}`, `auth/{forgot,reset}-password` |
+| Auth | `auth/[...nextauth]`, `auth/password-signin`, `auth/signup/{send-otp,verify-otp,complete}`, `auth/{forgot,reset}-password` |
 | Posts | `posts`, `posts/mine`, `posts/[id]` (+ `/close`, `/matches`, `/claims`) |
 | Claims | `claims/mine`, `claims/[id]` (+ `/approve`, `/reject`) |
 | Chat | `conversations/mine`, `conversations/[id]/messages`, `conversations/unread-count` |
@@ -113,13 +113,18 @@ and **pgvector** extensions (Neon and Supabase both provide them).
 
 ```bash
 npm install                          # also runs `prisma generate`
-cp .env.example .env                 # then fill in the values (see below)
-npx prisma migrate deploy            # create tables
-npx tsx scripts/setup-postgis.ts     # enable PostGIS, geography column + index
-npx tsx scripts/setup-pgvector.ts    # enable pgvector, embedding columns + index
+cp .env.example .env                 # then fill in the values
+psql "$DATABASE_URL" -c 'CREATE EXTENSION IF NOT EXISTS postgis; CREATE EXTENSION IF NOT EXISTS vector;'
+npx prisma migrate deploy            # tables, spatial/vector/text indexes, constraints
 npx prisma db seed                   # two demo accounts
 npm run dev                          # http://localhost:3000
 ```
+
+The extensions must exist **before** `migrate deploy` (the first migration uses the
+`geography` and `vector` types). Sign-up codes and alerts are emailed: set the
+`SMTP_*` variables in `.env` (any SMTP mailbox works, for example a Gmail app
+password) or `RESEND_API_KEY` with a verified domain; with neither, emails are
+printed to the console.
 
 > `npm run dev` runs `tsx server.ts` (Next.js + Socket.IO), not `next dev`.
 

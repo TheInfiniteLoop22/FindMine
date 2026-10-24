@@ -8,14 +8,15 @@ on:
 
 jobs:
   typecheck-test:
-    name: Typecheck & Test
+    name: Typecheck & Unit tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
+      # Same major version as the production Docker image (node:20).
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 20
           cache: npm
 
       # `prisma generate` runs as postinstall - it only reads schema.prisma
@@ -27,28 +28,70 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit
 
-      - name: Test
+      - name: Unit tests
         run: npm test
 
   lint:
-    name: Lint (non-blocking)
+    name: Lint
     runs-on: ubuntu-latest
-    # The codebase currently has a pre-existing lint baseline (mostly
-    # @typescript-eslint/no-explicit-any in the pre-Cloudinary/pre-TS-strict
-    # code, e.g. `catch (err: any)`). Making this job required would fail
-    # every build on debt unrelated to the change being made, so it reports
-    # but never blocks a merge until that baseline is paid down separately.
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 20
           cache: npm
 
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
       - name: Lint
-        run: npx eslint .
+        run: npx eslint . --max-warnings 3
+
+  # Runs the database-backed tests (claim-approval transaction, concurrent
+  # approvals, OTP single-use, auth lockout) against a real Postgres with PostGIS
+  # and pgvector, created from the checked-in migrations.
+  integration:
+    name: Integration tests (Postgres + PostGIS + pgvector)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: findmine_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/findmine_test
+      NEXTAUTH_SECRET: ci-only-secret-not-used-anywhere-else
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # The postgis image has no pgvector; install it from the PGDG repo it ships
+      # with, then enable both extensions before the migrations run.
+      - name: Add pgvector and enable extensions
+        run: |
+          CID=$(docker ps --filter "ancestor=postgis/postgis:16-3.4" -q | head -n 1)
+          docker exec "$CID" bash -c "apt-get update -qq && apt-get install -y -qq postgresql-16-pgvector"
+          docker exec "$CID" psql -U postgres -d findmine_test -c "CREATE EXTENSION IF NOT EXISTS postgis; CREATE EXTENSION IF NOT EXISTS vector;"
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Apply migrations
+        run: npx prisma migrate deploy
+
+      - name: Integration tests
+        run: npm run test:integration
