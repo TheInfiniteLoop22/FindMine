@@ -71,6 +71,8 @@ jobs:
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/findmine_test
       NEXTAUTH_SECRET: ci-only-secret-not-used-anywhere-else
+      # The auth integration tests exercise the demo-credentials path, which is gated on this flag.
+      ENABLE_DEMO_LOGIN: 'true'
     steps:
       - uses: actions/checkout@v4
 
