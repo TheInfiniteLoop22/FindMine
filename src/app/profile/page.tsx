@@ -7,9 +7,6 @@ import { Navbar } from '@/components/Navbar';
 import Image from 'next/image';
 import { ImageUploadField } from '@/components/ImageUploadField';
 import { Loader2, AlertCircle, Award, CheckCircle2, User, Mail, FileText, ShieldCheck, Trash2 } from 'lucide-react';
-import { auth } from '@/lib/firebase';
-import { EmailAuthProvider, linkWithCredential, sendEmailVerification } from 'firebase/auth';
-import { mapFirebaseAuthError } from '@/lib/firebaseErrors';
 import type { OwnProfile } from '@/types/profile';
 
 import { getErrorMessage } from '@/lib/errors';
@@ -30,14 +27,6 @@ export default function ProfilePage() {
   const [showNudge, setShowNudge] = useState(false);
   const [saving, setSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
-
-  // Contact & Verification panel state
-  const [addingEmail, setAddingEmail] = useState(false);
-  const [newEmail, setNewEmail] = useState('');
-  const [newEmailPassword, setNewEmailPassword] = useState('');
-  const [emailLinkSent, setEmailLinkSent] = useState(false);
-  const [contactError, setContactError] = useState<string | null>(null);
-  const [contactLoading, setContactLoading] = useState(false);
 
   // Delete-account state
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -121,57 +110,6 @@ export default function ProfilePage() {
       localStorage.setItem(`dismiss_nudge_${profile.id}`, 'true');
     }
     setShowNudge(false);
-  };
-
-  // Link a real email + password to the current Firebase account (for accounts that
-  // signed up via phone only), then send Firebase's own verification email.
-  const handleAddEmail = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setContactError(null);
-    if (!auth.currentUser) {
-      setContactError('Your Firebase session has expired - please sign out and sign in again.');
-      return;
-    }
-    try {
-      setContactLoading(true);
-      const credential = EmailAuthProvider.credential(newEmail.trim(), newEmailPassword);
-      await linkWithCredential(auth.currentUser, credential);
-      await sendEmailVerification(auth.currentUser);
-      setEmailLinkSent(true);
-    } catch (err: unknown) {
-      setContactError(mapFirebaseAuthError(err, 'Failed to link email'));
-    } finally {
-      setContactLoading(false);
-    }
-  };
-
-  // After the user clicks the verification link in their inbox, force-refresh the
-  // Firebase ID token (so it reflects emailVerified: true) and ask the server to persist it.
-  const handleConfirmEmailVerified = async () => {
-    setContactError(null);
-    if (!auth.currentUser) {
-      setContactError('Your Firebase session has expired - please sign out and sign in again.');
-      return;
-    }
-    try {
-      setContactLoading(true);
-      const idToken = await auth.currentUser.getIdToken(true);
-      const res = await fetch('/api/profile/verify-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Failed to verify email');
-      setAddingEmail(false);
-      setEmailLinkSent(false);
-      setSuccessMsg('Email verified and linked to your account!');
-      fetchProfile();
-    } catch (err: unknown) {
-      setContactError(getErrorMessage(err, 'Not verified yet - click the link in your email first.'));
-    } finally {
-      setContactLoading(false);
-    }
   };
 
   const handleDeleteAccount = async () => {
@@ -388,14 +326,8 @@ export default function ProfilePage() {
             Contact & Verification
           </h3>
 
-          {contactError && (
-            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{contactError}</span>
-            </div>
-          )}
-
-          {/* Email row */}
+          {/* Email row: the address comes from the Google account, which has
+              already verified it, so there is nothing to add or confirm here. */}
           <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/50">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2.5 min-w-0">
@@ -404,66 +336,12 @@ export default function ProfilePage() {
                   {profile.email?.startsWith('phone_') ? 'No email on file' : profile.email}
                 </span>
               </div>
-              {profile.emailVerified && !profile.email?.startsWith('phone_') ? (
+              {profile.emailVerified && !profile.email?.startsWith('phone_') && (
                 <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-full border border-emerald-200 shrink-0">
                   <ShieldCheck className="w-3 h-3" /> Verified
                 </span>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => { setAddingEmail(!addingEmail); setContactError(null); }}
-                  className="text-[10px] font-bold text-indigo-600 hover:underline shrink-0"
-                >
-                  {addingEmail ? 'Cancel' : 'Add & Verify Email'}
-                </button>
               )}
             </div>
-
-            {addingEmail && !profile.emailVerified && (
-              emailLinkSent ? (
-                <div className="mt-3 pt-3 border-t border-slate-200 space-y-2">
-                  <p className="text-xs text-slate-500">
-                    Verification link sent to <strong>{newEmail}</strong>. Click it, then confirm below.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={handleConfirmEmailVerified}
-                    disabled={contactLoading}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
-                  >
-                    {contactLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                    <span>I&apos;ve Verified — Refresh Status</span>
-                  </button>
-                </div>
-              ) : (
-                <form onSubmit={handleAddEmail} className="mt-3 pt-3 border-t border-slate-200 space-y-2">
-                  <input
-                    type="email"
-                    required
-                    placeholder="you@example.com"
-                    value={newEmail}
-                    onChange={(e) => setNewEmail(e.target.value)}
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                  <input
-                    type="password"
-                    required
-                    placeholder="Choose a password"
-                    value={newEmailPassword}
-                    onChange={(e) => setNewEmailPassword(e.target.value)}
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                  <button
-                    type="submit"
-                    disabled={contactLoading}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
-                  >
-                    {contactLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                    <span>Send Verification Email</span>
-                  </button>
-                </form>
-              )
-            )}
           </div>
         </div>
 

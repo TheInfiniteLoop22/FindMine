@@ -42,17 +42,6 @@ export default function NewRegisteredItemPage() {
   const [accountEmailVerified, setAccountEmailVerified] = useState(false);
   const [profileLoaded, setProfileLoaded] = useState(false);
 
-  // Add-a-first-verified-email flow — only ever shown when the account has no
-  // verified email yet (every normal sign-up path already ends with one, so
-  // this covers a rare edge case rather than the common case).
-  const [otpEmail, setOtpEmail] = useState('');
-  const [otpCode, setOtpCode] = useState('');
-  const [otpStep, setOtpStep] = useState<'enter-email' | 'enter-code'>('enter-email');
-  const [otpSending, setOtpSending] = useState(false);
-  const [otpVerifying, setOtpVerifying] = useState(false);
-  const [otpError, setOtpError] = useState<string | null>(null);
-  const [otpSentMessage, setOtpSentMessage] = useState<string | null>(null);
-
   // Image Upload State
   const [selectedImage, setSelectedImage] = useState<SelectedImage | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -81,49 +70,6 @@ export default function NewRegisteredItemPage() {
       .catch((err) => console.error('Failed to load profile for contact info:', err))
       .finally(() => setProfileLoaded(true));
   }, [status]);
-
-  const handleSendEmailOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setOtpError(null);
-    setOtpSentMessage(null);
-    try {
-      setOtpSending(true);
-      const res = await fetch('/api/profile/email/send-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: otpEmail }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Failed to send verification code.');
-      setOtpSentMessage(`Code sent to ${otpEmail}.`);
-      setOtpStep('enter-code');
-    } catch (err: unknown) {
-      setOtpError(getErrorMessage(err, 'Failed to send verification code.'));
-    } finally {
-      setOtpSending(false);
-    }
-  };
-
-  const handleVerifyEmailOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setOtpError(null);
-    try {
-      setOtpVerifying(true);
-      const res = await fetch('/api/profile/email/verify-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: otpEmail, code: otpCode }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Invalid or expired code.');
-      setAccountEmail(json.data.email);
-      setAccountEmailVerified(!!json.data.emailVerified);
-    } catch (err: unknown) {
-      setOtpError(getErrorMessage(err, 'Invalid or expired code.'));
-    } finally {
-      setOtpVerifying(false);
-    }
-  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setError(null);
@@ -402,11 +348,8 @@ export default function NewRegisteredItemPage() {
 
           {/* This is locked to the user's own verified account email rather than
               free text, since this is exactly what a stranger who scans the QR
-              code will see and contact. Most accounts already have one (every
-              current sign-up path — email/password OTP, Google, or a seed
-              account — ends with a verified email), so this is a simple
-              confirmation. The rare account without one gets an inline
-              add-and-verify flow instead of a dead-looking blocked field. */}
+              code will see and contact. Google and demo accounts always have
+              one. */}
           {contactMode === 'SHOW_EMAIL' && profileLoaded && (
             <div className="animate-in fade-in slide-in-from-top-2">
               {accountEmail && accountEmailVerified ? (
@@ -423,76 +366,11 @@ export default function NewRegisteredItemPage() {
                   </div>
                 </div>
               ) : (
-                <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/60 space-y-3">
+                <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/60">
                   <p className="text-xs font-semibold text-amber-900">
-                    Your account doesn&apos;t have a verified email yet — add and verify one to use
-                    this contact mode.
+                    Your account doesn&apos;t have a verified email, so this contact mode isn&apos;t
+                    available. Choose &quot;Relay only&quot; instead.
                   </p>
-
-                  {otpError && (
-                    <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
-                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                      <span>{otpError}</span>
-                    </div>
-                  )}
-
-                  {otpStep === 'enter-email' ? (
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      <input
-                        type="email"
-                        required
-                        value={otpEmail}
-                        onChange={(e) => setOtpEmail(e.target.value)}
-                        placeholder="you@example.com"
-                        className="flex-1 px-3.5 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleSendEmailOtp}
-                        disabled={otpSending || !otpEmail.trim()}
-                        className="px-4 py-2 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5 shrink-0"
-                      >
-                        {otpSending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                        <span>Send Code</span>
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {otpSentMessage && <p className="text-[11px] text-emerald-700 font-medium">{otpSentMessage}</p>}
-                      <div className="flex flex-col sm:flex-row gap-2">
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          required
-                          maxLength={6}
-                          value={otpCode}
-                          onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
-                          placeholder="6-digit code"
-                          className="flex-1 px-3.5 py-2 rounded-xl border border-slate-200 text-sm tracking-widest focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
-                        />
-                        <button
-                          type="button"
-                          onClick={handleVerifyEmailOtp}
-                          disabled={otpVerifying || otpCode.length !== 6}
-                          className="px-4 py-2 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5 shrink-0"
-                        >
-                          {otpVerifying && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                          <span>Verify Code</span>
-                        </button>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setOtpStep('enter-email');
-                          setOtpCode('');
-                          setOtpError(null);
-                        }}
-                        className="text-[11px] font-semibold text-amber-700 hover:underline"
-                      >
-                        Use a different email
-                      </button>
-                    </div>
-                  )}
                 </div>
               )}
             </div>

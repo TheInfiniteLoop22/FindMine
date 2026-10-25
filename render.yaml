@@ -36,12 +36,12 @@ services:
         sync: false
       - key: RESEND_API_KEY
         sync: false
-      # Sign-up codes and alerts: set SMTP_* (any SMTP mailbox, e.g. a Gmail app
-      # password) to deliver to arbitrary recipients; it takes precedence over Resend.
+      # Relay-message alerts only (sign-in is Google only). Render's free tier
+      # blocks SMTP ports 25/465/587, so use port 2525 (e.g. Brevo) or Resend.
       - key: SMTP_HOST
         sync: false
       - key: SMTP_PORT
-        value: "587"
+        value: "2525"
       - key: SMTP_USER
         sync: false
       - key: SMTP_PASS

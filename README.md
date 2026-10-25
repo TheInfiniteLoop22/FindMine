@@ -103,9 +103,9 @@ user holding two active claims on one post.
 - **Privacy by design.** Public QR responses are built from an allow-list; the relay
   never reveals the owner's contact details; scan locations are stored as a rough area,
   never an IP address.
-- **Defence in depth.** Server-side password sign-in with per-IP limiting (keyed on
-  `CF-Connecting-IP` behind Cloudflare) and per-account lockout, timing-safe failure
-  paths, hashed single-use tokens, parameterised raw SQL, ownership checks on every
+- **Defence in depth.** Per-IP rate limiting (keyed on `CF-Connecting-IP` behind
+  Cloudflare), lockout and timing-safe failure paths on the demo login, Google ID tokens
+  verified server-side, parameterised raw SQL, ownership checks on every
   mutating route, and escaped HTML in emails.
 - **Schema changes as migrations**, tried on a throwaway database branch first:
   typed `geography` / `vector` columns, GiST, HNSW and trigram indexes.
@@ -139,16 +139,15 @@ npm run dev                          # http://localhost:3000
 | `DATABASE_URL` | Yes | Postgres connection string |
 | `NEXTAUTH_SECRET` | Yes | Session signing secret (`openssl rand -base64 32`); the app refuses to start without it |
 | `NEXTAUTH_URL` | Recommended | Public URL of the app |
-| `NEXT_PUBLIC_FIREBASE_*` (6 values) | For real sign-in | Firebase web config for Google and email/password sign-in |
+| `NEXT_PUBLIC_FIREBASE_*` (6 values) | For real sign-in | Firebase web config for Google sign-in |
 | `CLOUDINARY_CLOUD_NAME`, `_API_KEY`, `_API_SECRET` | For uploads | Photo storage |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` | For email | Sign-up codes and alerts through any SMTP mailbox (a Gmail app password works) |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` | Optional | Relay-message alert emails through any SMTP mailbox. Render's free tier blocks ports 25/465/587, so use 2525 (e.g. Brevo) |
 | `EMAIL_FROM` | Optional | Sender address |
 | `RESEND_API_KEY` | Optional | Alternative to SMTP; needs a verified domain to reach arbitrary recipients |
 | `ENABLE_DEMO_LOGIN` | Optional | `true` enables the one-click demo accounts (default off) |
-| `HCAPTCHA_SECRET` | Optional | Turns on CAPTCHA for password reset |
 
 With no email provider configured, emails are printed to the server console, so you can
-read a verification code locally without any account. If your database is on Supabase, save
+see them locally without any account. If your database is on Supabase, save
 its CA certificate as `certs/supabase-ca.crt` (Dashboard → Project Settings → Database
 → SSL); Neon and most other providers need nothing extra.
 
