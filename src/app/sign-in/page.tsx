@@ -1,14 +1,10 @@
 'use client';
 
 import React, { useState, useEffect, Suspense } from 'react';
-import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
+import { useRouter } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 import { Navbar } from '@/components/Navbar';
-import { Loader2, AlertCircle, CheckCircle } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
 import { auth } from '@/lib/firebase';
 import {
   GoogleAuthProvider,
@@ -17,19 +13,11 @@ import {
 import { mapFirebaseAuthError } from '@/lib/firebaseErrors';
 
 import { getErrorMessage } from '@/lib/errors';
-const signInSchema = z.object({
-  email: z.string().email('Please enter a valid email address'),
-  password: z.string().min(1, 'Password is required'),
-});
-
-type SignInFormData = z.infer<typeof signInSchema>;
 
 function SignInForm() {
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   const [serverError, setServerError] = useState<string | null>(null);
-  const [verifiedSuccess, setVerifiedSuccess] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   // Read from the server at request time rather than NEXT_PUBLIC_ENABLE_DEMO_LOGIN
   // inlined at build time — see src/app/api/config/route.ts for why.
@@ -45,7 +33,6 @@ function SignInForm() {
   const handleGoogleSignIn = async () => {
     try {
       setServerError(null);
-      setVerifiedSuccess(false);
       setGoogleLoading(true);
 
       const provider = new GoogleAuthProvider();
@@ -73,12 +60,6 @@ function SignInForm() {
     }
   };
 
-  useEffect(() => {
-    if (searchParams.get('verified') === 'true') {
-      setVerifiedSuccess(true);
-    }
-  }, [searchParams]);
-
   const [quickSignInLoading, setQuickSignInLoading] = useState<'AA' | 'BB' | null>(null);
 
   // Testing-phase convenience: instantly sign in as one of the two seeded demo
@@ -98,76 +79,6 @@ function SignInForm() {
       setServerError(getErrorMessage(err, 'Quick sign-in failed.'));
     } finally {
       setQuickSignInLoading(null);
-    }
-  };
-
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-  } = useForm<SignInFormData>({
-    resolver: zodResolver(signInSchema),
-  });
-
-  // Handle Email/Password Login
-  const onSubmit = async (data: SignInFormData) => {
-    try {
-      setServerError(null);
-      setVerifiedSuccess(false);
-
-      // Seed Account check (bypass Firebase) — gated the same way the server
-      // gates it in auth.ts; keeping both in sync so a disabled flag doesn't
-      // leave a dead client-side call that fails confusingly against a
-      // server that already refuses it.
-      if (demoLoginEnabled && (data.email === 'a@gmail.com' || data.email === 'b@gmail.com')) {
-        const signInRes = await signIn('credentials', {
-          email: data.email,
-          password: data.password,
-          redirect: false,
-        });
-
-        if (signInRes?.error) {
-          throw new Error(signInRes.error);
-        }
-
-        router.push('/');
-        router.refresh();
-        return;
-      }
-
-      // Normal accounts - verify with Firebase. Whether the email is actually
-      // verified is checked server-side in authorizeCredentials (against this
-      // app's own DB record, not just Firebase's mirrored flag - see the
-      // comment there) - not duplicated here, since Firebase's own
-      // `user.emailVerified` would incorrectly read false for accounts
-      // verified through this app's own email-OTP sign-up flow instead of
-      // Firebase's native link.
-      // The password check goes through our own route (not the Firebase SDK
-      // directly) so the server can rate-limit and lock out repeated failures.
-      const pwRes = await fetch('/api/auth/password-signin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: data.email, password: data.password }),
-      });
-      const pwJson = await pwRes.json().catch(() => ({}));
-      if (!pwRes.ok || !pwJson?.data?.idToken) {
-        throw new Error(pwJson?.error || 'Invalid email or password.');
-      }
-      const idToken: string = pwJson.data.idToken;
-      const signInRes = await signIn('credentials', {
-        idToken,
-        redirect: false,
-      });
-
-      if (signInRes?.error) {
-        throw new Error(signInRes.error);
-      }
-
-      router.push('/');
-      router.refresh();
-    } catch (err: unknown) {
-      console.error('Sign in error:', err);
-      setServerError(mapFirebaseAuthError(err, 'Invalid email or password'));
     }
   };
 
@@ -215,7 +126,7 @@ function SignInForm() {
         type="button"
         onClick={handleGoogleSignIn}
         disabled={googleLoading}
-        className="w-full py-2.5 px-4 rounded-xl border border-slate-300 font-semibold text-sm text-slate-700 bg-white hover:bg-slate-50 transition-colors flex items-center justify-center gap-2 shadow-xs mb-4 cursor-pointer disabled:opacity-50"
+        className="w-full py-2.5 px-4 rounded-xl border border-slate-300 font-semibold text-sm text-slate-700 bg-white hover:bg-slate-50 transition-colors flex items-center justify-center gap-2 shadow-xs cursor-pointer disabled:opacity-50"
       >
         {googleLoading ? (
           <Loader2 className="w-4 h-4 animate-spin text-slate-500" />
@@ -242,84 +153,12 @@ function SignInForm() {
         <span>{googleLoading ? 'Signing in...' : 'Continue with Google'}</span>
       </button>
 
-      <div className="relative my-6 text-center">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-slate-200" />
-        </div>
-        <span className="relative bg-white px-3 text-xs uppercase tracking-wider text-slate-400 font-semibold">
-          Or
-        </span>
-      </div>
-
-      {verifiedSuccess && (
-        <div className="mb-6 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm flex items-center gap-3">
-          <CheckCircle className="w-5 h-5 shrink-0 text-emerald-500" />
-          <span>Email verified successfully! You can now log in.</span>
-        </div>
-      )}
-
       {serverError && (
-        <div className="mb-6 p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-sm flex items-center gap-3">
+        <div className="mt-4 p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-sm flex items-center gap-3">
           <AlertCircle className="w-5 h-5 shrink-0" />
           <span>{serverError}</span>
         </div>
       )}
-
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        <div>
-          <label className="block text-sm font-semibold text-slate-800 mb-1">
-            Email Address <span className="text-rose-500">*</span>
-          </label>
-          <input
-            type="email"
-            placeholder="you@example.com"
-            {...register('email')}
-            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-          {errors.email && (
-            <p className="mt-1 text-xs text-rose-500">{errors.email.message}</p>
-          )}
-        </div>
-
-        <div>
-          <div className="flex justify-between items-center mb-1">
-            <label className="block text-sm font-semibold text-slate-800">
-              Password <span className="text-rose-500">*</span>
-            </label>
-            <Link
-              href="/sign-in/forgot-password"
-              className="text-xs font-semibold text-indigo-600 hover:underline"
-            >
-              Forgot Password?
-            </Link>
-          </div>
-          <input
-            type="password"
-            placeholder="Your password"
-            {...register('password')}
-            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-          {errors.password && (
-            <p className="mt-1 text-xs text-rose-500">{errors.password.message}</p>
-          )}
-        </div>
-
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="w-full mt-2 py-2.5 px-4 rounded-xl text-sm font-bold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
-        >
-          {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
-          <span>{isSubmitting ? 'Signing in...' : 'Sign In'}</span>
-        </button>
-      </form>
-
-      <p className="mt-6 text-center text-xs text-slate-500">
-        Don&apos;t have an account?{' '}
-        <Link href="/sign-up" className="font-bold text-indigo-600 hover:underline">
-          Sign Up
-        </Link>
-      </p>
     </div>
   );
 }

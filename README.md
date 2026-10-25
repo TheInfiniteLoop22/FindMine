@@ -40,8 +40,8 @@ and try the chat.
 - **QR pre-registration** — register an item in advance and print its QR code. A finder
   who scans it can message the owner through a privacy-preserving relay; the owner's
   email is never shown unless they choose to share it.
-- **Accounts** — Google sign-in and email sign-up with a 6-digit email code; password
-  sign-in is rate-limited and locks an account after repeated failures.
+- **Accounts** — Google sign-in only (the account is created on first sign-in and the
+  email comes from the Google account); no passwords are stored for real users.
 - **Notifications and reputation** — in-app alerts for QR scans and relay messages, and
   a reputation score earned through approved claims.
 
@@ -148,7 +148,7 @@ npm run dev                          # http://localhost:3000
 | `HCAPTCHA_SECRET` | Optional | Turns on CAPTCHA for password reset |
 
 With no email provider configured, emails are printed to the server console, so you can
-read a sign-up code locally without any account. If your database is on Supabase, save
+read a verification code locally without any account. If your database is on Supabase, save
 its CA certificate as `certs/supabase-ca.crt` (Dashboard → Project Settings → Database
 → SSL); Neon and most other providers need nothing extra.
 
@@ -202,7 +202,7 @@ All routes live under `src/app/api/`.
 
 | Area | Routes |
 |---|---|
-| Auth | `auth/[...nextauth]`, `auth/password-signin`, `auth/signup/{send-otp,verify-otp,complete}`, `auth/{forgot,reset}-password` |
+| Auth | `auth/[...nextauth]` |
 | Posts | `posts`, `posts/mine`, `posts/[id]` (+ `/close`, `/matches`, `/claims`) |
 | Claims | `claims/mine`, `claims/[id]` (+ `/approve`, `/reject`) |
 | Chat | `conversations/mine`, `conversations/[id]/messages`, `conversations/unread-count` |

@@ -204,22 +204,13 @@ export const SideDrawer: React.FC<SideDrawerProps> = ({
               Sign Out
             </button>
           ) : (
-            <div className="space-y-2">
-              <Link
-                href="/sign-in"
-                onClick={onClose}
-                className="block text-center w-full py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all"
-              >
-                Sign In
-              </Link>
-              <Link
-                href="/sign-up"
-                onClick={onClose}
-                className="block text-center w-full py-2.5 rounded-xl bg-indigo-600 text-sm font-bold text-white hover:bg-indigo-700 transition-all"
-              >
-                Sign Up
-              </Link>
-            </div>
+            <Link
+              href="/sign-in"
+              onClick={onClose}
+              className="block text-center w-full py-2.5 rounded-xl bg-indigo-600 text-sm font-bold text-white hover:bg-indigo-700 transition-all"
+            >
+              Sign In
+            </Link>
           )}
         </div>
       </div>
