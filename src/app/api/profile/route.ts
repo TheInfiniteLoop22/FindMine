@@ -152,6 +152,17 @@ export async function DELETE(request: Request) {
       );
     }
 
+    const account = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { isSeedAccount: true },
+    });
+    if (account?.isSeedAccount) {
+      return NextResponse.json(
+        { error: 'Demo accounts cannot be deleted.', code: 'DEMO_ACCOUNT' },
+        { status: 403 }
+      );
+    }
+
     await prisma.$transaction([
       prisma.registeredItem.deleteMany({ where: { userId: session.user.id } }),
       prisma.user.delete({ where: { id: session.user.id } }),

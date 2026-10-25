@@ -26,4 +26,4 @@ const app = getApps().length > 0
 
 const auth = getAuth(app);
 
-export { app, auth };
+export { auth };

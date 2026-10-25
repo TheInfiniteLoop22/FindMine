@@ -117,7 +117,7 @@ export async function runEmbeddingJob(postId: string) {
 const STALE_PROCESSING_TIMEOUT_MS = 5 * 60 * 1000;
 const STALE_SWEEP_INTERVAL_MS = 5 * 60 * 1000;
 
-export async function sweepStaleEmbeddingJobs({ includeFailed = false } = {}) {
+async function sweepStaleEmbeddingJobs({ includeFailed = false } = {}) {
   try {
     const now = Date.now();
     const processingPosts = await prisma.post.findMany({
@@ -187,7 +187,7 @@ export function startStaleEmbeddingSweep() {
   return timer;
 }
 
-export async function computeMatchesForPost(postId: string) {
+async function computeMatchesForPost(postId: string) {
   logger.info('Matching: computing matches for post', { postId });
 
   interface MatchCandidateRow {

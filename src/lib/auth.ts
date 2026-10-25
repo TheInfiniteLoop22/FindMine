@@ -106,21 +106,9 @@ export async function authorizeCredentials(
       where: { email },
     });
 
-    // Server-side enforcement (not just client-side) that an email account is
-    // actually verified before it can sign in — applies uniformly to every path
-    // that reaches here (Google, email/password), not just whichever tab the
-    // frontend happens to gate.
-    //
-    // This checks OUR OWN DB record first, not only Firebase's mirrored
-    // `emailVerified` flag: email/password sign-up now proves ownership via a
-    // custom email-OTP flow (`/api/auth/signup/*`, see emailOtp.ts) instead of
-    // Firebase's native verification link, and pre-creates the Prisma `User` row
-    // with `emailVerified` already set at that point — Firebase's own copy of the
-    // flag stays false forever for those accounts since Firebase was never asked
-    // to verify anything. Google accounts don't need this fallback (Firebase's
-    // flag is already true, verified by Google itself); the DB fallback only
-    // ever trusts a value this server previously set itself, never anything the
-    // client supplies directly, so it can't be used to fake verification.
+    // Only accounts whose email is verified may sign in. Google verifies the
+    // address itself, so in practice this only rejects an unverified Firebase
+    // account; our own DB flag is honoured too so it can never be set by the client.
     if (email && !emailVerified && !user?.emailVerified) {
       throw new Error('Please verify your email before signing in.');
     }

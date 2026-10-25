@@ -333,10 +333,10 @@ export default function ProfilePage() {
               <div className="flex items-center gap-2.5 min-w-0">
                 <Mail className="w-4 h-4 text-slate-400 shrink-0" />
                 <span className="text-sm text-slate-700 truncate">
-                  {profile.email?.startsWith('phone_') ? 'No email on file' : profile.email}
+                  {profile.email}
                 </span>
               </div>
-              {profile.emailVerified && !profile.email?.startsWith('phone_') && (
+              {profile.emailVerified && (
                 <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-full border border-emerald-200 shrink-0">
                   <ShieldCheck className="w-3 h-3" /> Verified
                 </span>
