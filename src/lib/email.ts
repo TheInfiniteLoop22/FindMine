@@ -32,6 +32,11 @@ function getSmtpTransport(): Transporter {
       host: process.env.SMTP_HOST,
       port,
       secure: port === 465,
+      // Fail fast when the host blocks outbound SMTP (e.g. Render's free tier
+      // blocks 25/465/587) instead of hanging for nodemailer's 2-minute default.
+      connectionTimeout: 10_000,
+      greetingTimeout: 10_000,
+      socketTimeout: 20_000,
       auth: process.env.SMTP_USER
         ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
         : undefined,
