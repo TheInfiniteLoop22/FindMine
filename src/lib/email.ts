@@ -16,13 +16,18 @@ import { logger } from './logger';
  *
  * Failure contract: this never throws. It returns `{ success: false, error }`
  * for EVERY failure, including the ones the Resend SDK reports by *returning*
- * `{ error }` instead of throwing - callers decide whether that is loud (sign-up
- * OTP -> 502) or quiet (QR relay alert, which has an in-app notification).
+ * `{ error }` instead of throwing - callers decide whether that is loud
+ * or quiet (QR relay alert, which has an in-app notification).
  */
 const DEFAULT_FROM = 'FindMine <onboarding@resend.dev>';
 
 const resendApiKey = process.env.RESEND_API_KEY || 're_mockKey123456';
 const resend = new Resend(resendApiKey);
+
+/** True when a real provider (SMTP or a non-mock Resend key) is configured. */
+export function isEmailConfigured(): boolean {
+  return !!process.env.SMTP_HOST || !resendApiKey.startsWith('re_mock');
+}
 
 let smtpTransport: Transporter | null = null;
 function getSmtpTransport(): Transporter {

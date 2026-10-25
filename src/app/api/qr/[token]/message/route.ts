@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { sendEmail } from '@/lib/email';
+import { sendEmail, isEmailConfigured } from '@/lib/email';
 import { createNotification } from '@/lib/notifications';
 import { z } from 'zod';
 import { escapeHtml } from '@/lib/html';
@@ -87,11 +87,13 @@ export async function POST(
         registeredItemId: item.id,
         message: message.trim(),
         finderContact: finderContact || null,
-        deliveredVia: 'email',
+        deliveredVia: 'in-app',
       },
     });
 
-    // 4. Send transactional notification email alert to owner
+    // 4. Email copy for owners who aren't in the app. Optional: only sent when a
+    // provider is configured, and never awaited, so a slow or broken mail server
+    // can't hold up the finder's request.
     const emailHtml = `
       <div style="font-family: sans-serif; padding: 20px; color: #1e293b;">
         <h2 style="color: #4f46e5;">[FindMine] Good News! A finder scanned your item</h2>
@@ -118,15 +120,6 @@ export async function POST(
       </div>
     `;
 
-    // Best-effort secondary channel — silently no-ops to a console log if
-    // RESEND_API_KEY isn't configured (see src/lib/email.ts), so this alone must
-    // never be the only thing the "the owner has been notified" promise rests on.
-    await sendEmail({
-      to: item.user.email,
-      subject: `[FindMine Alert] Relay Message for your item: ${item.nickname}`,
-      html: emailHtml,
-    });
-
     // The real, always-lands alert: an in-app notification the owner will see the
     // next time they're in the app, regardless of whether email delivery worked.
     await createNotification({
@@ -138,6 +131,14 @@ export async function POST(
         : message.trim(),
       linkUrl: `/my-items?item=${item.id}`,
     });
+
+    if (isEmailConfigured()) {
+      void sendEmail({
+        to: item.user.email,
+        subject: `[FindMine Alert] Relay Message for your item: ${item.nickname}`,
+        html: emailHtml,
+      });
+    }
 
     return NextResponse.json({ data: relayMsg }, { status: 201 });
   } catch (error) {
